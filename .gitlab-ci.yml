@@ -1,0 +1,21 @@
+image: rust:1.51.0
+
+
+stages:
+  - lint
+  - build
+
+lint:
+  stage: lint
+  script:
+    - rustup component add rustfmt clippy
+    - cargo fmt -- --check
+    - cargo clippy -- -D warnings
+
+build:
+  stage: build
+  script:
+    - cargo build --release
+  artifacts:
+    paths:
+      - target

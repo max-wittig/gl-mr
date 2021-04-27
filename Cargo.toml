@@ -8,5 +8,3 @@ edition = "2018"
 
 [dependencies]
 structopt = { version = "0.3", default-features = false }
-gitlab = "=0.1310.0"
-git2 = "0.13"

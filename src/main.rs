@@ -1,7 +1,7 @@
 use structopt::StructOpt;
 mod credentials;
-mod git_helper;
-use credentials::GitLabCredentials;
+mod git;
+use std::path::PathBuf;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "gl-mr", about = "Usage of gl-mr")]
@@ -13,8 +13,9 @@ struct Opt {
 
 fn main() {
     let opt = Opt::from_args();
-    println!("{:?}", opt);
-    let env = GitLabCredentials::from_env();
-    println!("{:?}", env);
-    git_helper::get_project_id();
+    let git = git::Git::new(
+        None,
+        Some(PathBuf::from("/Users/max/Documents/Development/code")),
+    );
+    git::create_separate_merge_requests(&git);
 }

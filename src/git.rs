@@ -98,8 +98,23 @@ impl Git {
         self.execute(vec!["switch", &branch_name]).ok();
     }
 
-    fn push(&self, branch_name: &str) {
-        self.execute(vec!["push", "origin", branch_name]).ok();
+    fn push(&self, branch_name: &str, commit_message: &str, description: &str) {
+        self.execute(vec![
+            "push",
+            "-o",
+            "merge_request.create",
+            "-o",
+            !format!("merge_request.target={}", self.get_current_branch()),
+            "-o",
+            "merge_request.remove_source_branch",
+            "-o",
+            format!("merge_request.title={}", commit_message),
+            "-o",
+            format!("merge_request.description={}", description),
+            "origin",
+            branch_name,
+        ])
+        .ok();
     }
 }
 

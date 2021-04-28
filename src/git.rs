@@ -94,7 +94,13 @@ impl Git {
         Some(String::from("origin"))
     }
 
-    fn push(&self, branch_name: &str) {}
+    fn switch(&self, branch_name: &str) {
+        self.execute(vec!["switch", &branch_name]).ok();
+    }
+
+    fn push(&self, branch_name: &str) {
+        self.execute(vec!["push", "origin", branch_name]).ok();
+    }
 }
 
 fn create_branches(git: &Git, names: &Vec<String>) {
@@ -113,7 +119,7 @@ fn rebase_commits_onto_branches(git: &Git, commits_and_branches: &Vec<CommitBran
     // ignore errors
     let current_branch = git.get_current_branch();
     for commit_branch in commits_and_branches {
-        git.execute(vec!["switch", &commit_branch.branch_name]).ok();
+        git.switch(&commit_branch.branch_name);
         println!("Created {}", commit_branch);
         git.execute(vec!["rebase", &commit_branch.commit_sha]).ok();
     }

@@ -128,7 +128,7 @@ pub fn create_separate_merge_requests(git: &Git) {
         .into_iter()
         .map(|cb| cb.branch_name)
         .collect();
-    let branches = create_branches(&git, &branches);
+    create_branches(&git, &branches);
     rebase_commits_onto_branches(&git, &commits_and_branches);
     //push_branches(&git, &branches);
     // get default branch

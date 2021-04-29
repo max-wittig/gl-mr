@@ -78,8 +78,8 @@ impl Git {
         .collect()
     }
 
-    fn get_default_branch(&self) -> Option<String> {
-        Some(String::from("master"))
+    fn get_default_branch(&self) -> String {
+        String::from("master")
     }
 
     fn get_current_branch(&self) -> String {
@@ -104,13 +104,13 @@ impl Git {
             "-o",
             "merge_request.create",
             "-o",
-            !format!("merge_request.target={}", self.get_current_branch()),
+            &format!("merge_request.target={}", self.get_default_branch()),
             "-o",
             "merge_request.remove_source_branch",
             "-o",
-            format!("merge_request.title={}", commit_message),
+            &format!("merge_request.title={}", commit_message),
             "-o",
-            format!("merge_request.description={}", description),
+            &format!("merge_request.description={}", description),
             "origin",
             branch_name,
         ])
@@ -126,7 +126,9 @@ fn create_branches(git: &Git, names: &Vec<String>) {
 
 fn push_branches(git: &Git, branches: &Vec<String>) {
     for branch in branches {
-        git.push(branch);
+        let msg = "stuff";
+        let description = "stuff2";
+        git.push(&branch, &msg, &description);
     }
 }
 
@@ -142,7 +144,7 @@ fn rebase_commits_onto_branches(git: &Git, commits_and_branches: &Vec<CommitBran
 }
 
 pub fn create_separate_merge_requests(git: &Git) {
-    let default_branch = git.get_default_branch().unwrap();
+    let default_branch = git.get_default_branch();
     let commits_and_branches = git.get_commit_branch_till_branch(default_branch);
     let branches: Vec<String> = commits_and_branches
         .clone()

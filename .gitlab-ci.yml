@@ -1,0 +1,11 @@
+image: rust:1.51.0
+
+
+build:
+  script:
+    - cargo build --release
+  artifacts:
+    paths:
+      - target/release
+  only:
+    - main

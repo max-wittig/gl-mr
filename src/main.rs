@@ -16,12 +16,6 @@ struct Opt {
 
 fn main() {
     let opt = Opt::from_args();
-    let git = git::Git::new(
-        None,
-        Some(PathBuf::from(
-            "/Users/max/Documents/Development/gl-mr/example-try",
-        )),
-        opt.dry,
-    );
+    let git = git::Git::new(None, Some(PathBuf::from(".")), opt.dry);
     git::create_separate_merge_requests(&git);
 }

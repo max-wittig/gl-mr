@@ -1,5 +1,4 @@
 use regex::Regex;
-use std::env;
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -19,7 +18,7 @@ pub struct CommitDetails {
 
 impl CommitDetails {
     pub fn from_str(commit_branch_string: &str) -> CommitDetails {
-        let split_str: Vec<&str> = commit_branch_string.split("|").collect();
+        let split_str: Vec<&str> = commit_branch_string.split('|').collect();
         CommitDetails {
             commit_sha: split_str[0].to_string(),
             subject: split_str[1].to_string(),
@@ -40,20 +39,22 @@ impl std::fmt::Display for CommitDetails {
 }
 
 impl Git {
-    pub fn new(executable: Option<String>, path: Option<PathBuf>, dry: bool) -> Git {
+    pub fn new(executable: Option<String>, path: PathBuf, dry: bool) -> Git {
         let git = Git {
-            executable: executable.unwrap_or("git".to_string()),
-            working_dir: path.unwrap_or(env::current_dir().unwrap()),
-            dry: dry,
+            executable: executable.unwrap_or_else(|| "git".to_string()),
+            working_dir: path,
+            dry,
         };
         git.check_valid_state();
         git
     }
 
     fn check_valid_state(&self) {
-        // check that is valid git repo
+        if !self.working_dir.exists() {
+            panic!("Not a valid working directory!");
+        }
         self.execute(vec!["rev-parse", "--git-dir"])
-            .expect("Not a git repository!");
+            .expect("Not a valid git repository!");
     }
 
     fn create_branch(&self, name: &str, from: &str) {
@@ -62,44 +63,49 @@ impl Git {
             println!("git checkout -b {} {}", name, from);
             return;
         }
-        self.execute(vec!["checkout", "-b", name, from]).ok();
+        self.execute(vec!["checkout", "-b", name, from])
+            .expect("Could not create branch");
         self.switch(&current_branch);
     }
 
     fn execute(&self, args: Vec<&str>) -> Result<String, i32> {
         let output = Command::new(self.executable.clone())
             .current_dir(self.working_dir.as_path())
-            .args(args)
+            .args(&args)
             .output()
-            .unwrap();
-        if output.status.code().unwrap() != 0 {
-            return Err(1);
+            .expect("Could not execute git command");
+        let status_code = output.status.code().expect("Failed to get status");
+        if status_code != 0 {
+            return Err(status_code);
         }
-        Ok(String::from_utf8(output.stdout).unwrap())
+        Ok(String::from_utf8(output.stdout).expect("Could not parse output"))
     }
 
     fn get_default_branch(&self) -> String {
-        let branch_regex = Regex::new(r"(HEAD\sbranch:\s)(.*)").unwrap();
+        let branch_regex = Regex::new(r"(HEAD\sbranch:\s)(.*)").expect("Couldn't compile regex");
         let remote = self.get_remote();
-        let remote_output_str = self.execute(vec!["remote", "show", &remote]).ok().unwrap();
+        let remote_output_str = self
+            .execute(vec!["remote", "show", &remote])
+            .expect("Could not show remote! Maybe you haven't added any yet?");
         let remote_output_split: Vec<&str> = remote_output_str
             .lines()
             .filter(|s| branch_regex.is_match(s))
             .collect();
-        let first_entry = remote_output_split.first().unwrap();
+        let first_entry = remote_output_split
+            .first()
+            .expect("Couldn't find regex match!");
         branch_regex
             .captures(first_entry)
-            .unwrap()
+            .expect("No captures found!")
             .get(2)
-            .unwrap()
+            .expect("Couldn't find second match group")
             .as_str()
             .to_owned()
     }
 
     fn get_current_branch(&self) -> String {
         self.execute(vec!["rev-parse", "--abbrev-ref", "HEAD"])
-            .ok()
-            .unwrap()
+            .expect("Could not get current branch!")
     }
 
     fn get_remote(&self) -> String {
@@ -110,28 +116,28 @@ impl Git {
 
     fn switch(&self, branch_name: &str) {
         if self.dry {
-            println!("git switch {}", branch_name);
+            println!("git checkout {}", branch_name);
             return;
         }
-        self.execute(vec!["switch", &branch_name]).ok();
+        self.execute(vec!["checkout", &branch_name])
+            .expect("Unable to switch branch");
     }
 
-    fn rebase(&self, commit_sha: &str, rebase_branch: &str) -> Result<String, i32> {
+    fn rebase(&self, commit_sha: &str, rebase_branch: &str) {
         if self.dry {
             println!("git rebase {} {}", commit_sha, rebase_branch);
-            return Ok("".to_string());
         }
         self.execute(vec!["rebase", commit_sha, rebase_branch])
+            .expect("Rebase failed!");
     }
 
-    fn push(&self, branch_name: &str, push_options: &Vec<String>) {
+    fn push(&self, branch_name: &str, push_options: &[String]) {
         if self.dry {
             println!("git push {}", branch_name);
             return;
         }
         let remote = self.get_remote();
-        let mut push_command = Vec::new();
-        push_command.push("push");
+        let mut push_command = vec!["push"];
         // TODO: this should be possible with .append()
         for option in push_options {
             push_command.push(&option);
@@ -139,7 +145,8 @@ impl Git {
         push_command.push("-u");
         push_command.push(&remote);
         push_command.push(branch_name);
-        self.execute(push_command).ok();
+        self.execute(push_command)
+            .expect("Could not push to remote");
     }
 }
 
@@ -158,7 +165,7 @@ pub fn get_commit_branch_till_branch(git: &Git, branch_name: &str) -> Vec<Commit
     .collect()
 }
 
-fn create_branches(git: &Git, names: &Vec<String>, from_branch: &str) {
+fn create_branches(git: &Git, names: &[String], from_branch: &str) {
     for name in names {
         git.create_branch(name, from_branch);
     }
@@ -188,7 +195,7 @@ fn get_default_push_options(
     options
 }
 
-fn push_branches(git: &Git, commit_details: &Vec<CommitDetails>, target_branch: &str) {
+fn push_branches(git: &Git, commit_details: &[CommitDetails], target_branch: &str) {
     let last_index = commit_details.len() - 1;
     for (i, commit_detail) in commit_details.iter().enumerate() {
         let subject = if i != last_index {
@@ -202,20 +209,19 @@ fn push_branches(git: &Git, commit_details: &Vec<CommitDetails>, target_branch: 
     }
 }
 
-fn rebase_commits_onto_branches(git: &Git, commit_details: &Vec<CommitDetails>) {
+fn rebase_commits_onto_branches(git: &Git, commit_details: &[CommitDetails]) {
     // ignore errors
     for commit_branch in commit_details {
         println!("Created {}", commit_branch);
-        git.rebase(&commit_branch.commit_sha, &commit_branch.branch_name)
-            .ok();
+        git.rebase(&commit_branch.commit_sha, &commit_branch.branch_name);
     }
 }
 
-fn get_branches(commit_details: &Vec<CommitDetails>) -> Vec<String> {
+fn get_branches(commit_details: &[CommitDetails]) -> Vec<String> {
     commit_details
-        .clone()
+        .to_owned()
         .into_iter()
-        .map(|cb| cb.branch_name)
+        .map(|cd| cd.branch_name)
         .collect()
 }
 

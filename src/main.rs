@@ -13,17 +13,21 @@ struct Opt {
     #[structopt(long)]
     dry: bool,
 
-    #[structopt(short, long)]
-    path: String,
+    // Path to the git repository. Defaults to the current working directory
+    #[structopt(parse(from_os_str), short, long, default_value = ".")]
+    path: PathBuf,
+
+    // Git executable. Defaults to the executable that's in $PATH
+    #[structopt(short, long, default_value = "git")]
+    git: String,
 }
 
 fn main() {
     let opt = Opt::from_args();
-    let path = if opt.path.is_empty() {
-        String::from(".")
-    } else {
-        opt.path
-    };
-    let git = git::Git::new(None, Some(PathBuf::from(path)), opt.dry);
+    if !opt.path.exists() || !opt.path.is_dir() {
+        eprintln!("Invalid path: {:?}", opt.path);
+        std::process::exit(1);
+    }
+    let git = git::Git::new(None, opt.path, opt.dry);
     git::create_separate_merge_requests(&git);
 }

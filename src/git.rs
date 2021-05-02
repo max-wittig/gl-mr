@@ -136,6 +136,7 @@ impl Git {
         for option in push_options {
             push_command.push(&option);
         }
+        push_command.push("-u");
         push_command.push(&remote);
         push_command.push(branch_name);
         self.execute(push_command).ok();

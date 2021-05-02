@@ -188,12 +188,15 @@ fn get_default_push_options(
 }
 
 fn push_branches(git: &Git, commit_details: &Vec<CommitDetails>, target_branch: &str) {
-    for commit_detail in commit_details {
-        let push_options = get_default_push_options(
-            target_branch,
-            &commit_detail.subject,
-            &commit_detail.description,
-        );
+    let last_index = commit_details.len() - 1;
+    for (i, commit_detail) in commit_details.iter().enumerate() {
+        let subject = if i != last_index {
+            format!("{} {}", "Draft: ", commit_detail.subject)
+        } else {
+            commit_detail.subject.to_string()
+        };
+        let push_options =
+            get_default_push_options(target_branch, &subject, &commit_detail.description);
         git.push(&commit_detail.branch_name, &push_options);
     }
 }

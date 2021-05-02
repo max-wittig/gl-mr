@@ -1,3 +1,4 @@
+use regex::Regex;
 use std::env;
 use std::path::PathBuf;
 use std::process::Command;
@@ -77,23 +78,22 @@ impl Git {
         Ok(String::from_utf8(output.stdout).unwrap())
     }
 
-    pub fn get_commit_branch_till_branch(&self, branch_name: &str) -> Vec<CommitDetails> {
-        self.execute(vec![
-            "rev-list",
-            "--format=%H|%s|%b|%f",
-            "--no-merges",
-            &format!("HEAD...{}", branch_name),
-        ])
-        .expect("Could not get commits!")
-        .lines()
-        .map(|s| s.to_string())
-        .filter(|s| !s.starts_with("commit "))
-        .map(|s| CommitDetails::from_str(&s))
-        .collect()
-    }
-
     fn get_default_branch(&self) -> String {
-        String::from("master")
+        let branch_regex = Regex::new(r"(HEAD\sbranch:\s)(.*)").unwrap();
+        let remote = self.get_remote();
+        let remote_output_str = self.execute(vec!["remote", "show", &remote]).ok().unwrap();
+        let remote_output_split: Vec<&str> = remote_output_str
+            .lines()
+            .filter(|s| branch_regex.is_match(s))
+            .collect();
+        let first_entry = remote_output_split.first().unwrap();
+        branch_regex
+            .captures(first_entry)
+            .unwrap()
+            .get(2)
+            .unwrap()
+            .as_str()
+            .to_owned()
     }
 
     fn get_current_branch(&self) -> String {
@@ -124,26 +124,6 @@ impl Git {
         self.execute(vec!["rebase", commit_sha, rebase_branch])
     }
 
-    fn get_default_push_options(&self, commit_message: &str, description: &str) -> Vec<String> {
-        let mut options: Vec<String> = vec![
-            "-o".to_string(),
-            "merge_request.create".to_string(),
-            "-o".to_string(),
-            "merge_request.remove_source_branch".to_string(),
-            "-o".to_string(),
-            format!("merge_request.target={}", self.get_default_branch()),
-        ];
-        if !commit_message.is_empty() {
-            options.push("-o".to_string());
-            options.push(format!("merge_request.title={}", commit_message));
-        }
-        if !description.is_empty() {
-            options.push("-o".to_string());
-            options.push(format!("merge_request.description={}", description));
-        }
-        options
-    }
-
     fn push(&self, branch_name: &str, push_options: &Vec<String>) {
         if self.dry {
             println!("git push {}", branch_name);
@@ -162,16 +142,58 @@ impl Git {
     }
 }
 
+pub fn get_commit_branch_till_branch(git: &Git, branch_name: &str) -> Vec<CommitDetails> {
+    git.execute(vec![
+        "rev-list",
+        "--format=%H|%s|%b|%f",
+        "--no-merges",
+        &format!("HEAD...{}", branch_name),
+    ])
+    .expect("Could not get commits!")
+    .lines()
+    .map(|s| s.to_string())
+    .filter(|s| !s.starts_with("commit "))
+    .map(|s| CommitDetails::from_str(&s))
+    .collect()
+}
+
 fn create_branches(git: &Git, names: &Vec<String>, from_branch: &str) {
     for name in names {
         git.create_branch(name, from_branch);
     }
 }
 
-fn push_branches(git: &Git, commit_details: &Vec<CommitDetails>) {
+fn get_default_push_options(
+    target_branch: &str,
+    commit_message: &str,
+    description: &str,
+) -> Vec<String> {
+    let mut options: Vec<String> = vec![
+        "-o".to_string(),
+        "merge_request.create".to_string(),
+        "-o".to_string(),
+        "merge_request.remove_source_branch".to_string(),
+        "-o".to_string(),
+        format!("merge_request.target={}", target_branch),
+    ];
+    if !commit_message.is_empty() {
+        options.push("-o".to_string());
+        options.push(format!("merge_request.title={}", commit_message));
+    }
+    if !description.is_empty() {
+        options.push("-o".to_string());
+        options.push(format!("merge_request.description={}", description));
+    }
+    options
+}
+
+fn push_branches(git: &Git, commit_details: &Vec<CommitDetails>, target_branch: &str) {
     for commit_detail in commit_details {
-        let push_options =
-            git.get_default_push_options(&commit_detail.subject, &commit_detail.description);
+        let push_options = get_default_push_options(
+            target_branch,
+            &commit_detail.subject,
+            &commit_detail.description,
+        );
         git.push(&commit_detail.branch_name, &push_options);
     }
 }
@@ -195,9 +217,9 @@ fn get_branches(commit_details: &Vec<CommitDetails>) -> Vec<String> {
 
 pub fn create_separate_merge_requests(git: &Git) {
     let default_branch = git.get_default_branch();
-    let commit_details = git.get_commit_branch_till_branch(&default_branch);
+    let commit_details = get_commit_branch_till_branch(&git, &default_branch);
     let branches: Vec<String> = get_branches(&commit_details);
     create_branches(&git, &branches, &default_branch);
     rebase_commits_onto_branches(&git, &commit_details);
-    push_branches(&git, &commit_details);
+    push_branches(&git, &commit_details, &default_branch);
 }

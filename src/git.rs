@@ -58,14 +58,12 @@ impl Git {
     }
 
     fn create_branch(&self, name: &str, from: &str) {
-        let current_branch = self.get_current_branch();
         if self.dry {
             println!("git checkout -b {} {}", name, from);
             return;
         }
         self.execute(vec!["checkout", "-b", name, from])
             .expect("Could not create branch");
-        self.switch(&current_branch);
     }
 
     fn execute(&self, args: Vec<&str>) -> Result<String, i32> {
@@ -115,6 +113,9 @@ impl Git {
     }
 
     fn switch(&self, branch_name: &str) {
+        if self.get_current_branch() == branch_name {
+            return;
+        }
         if self.dry {
             println!("git checkout {}", branch_name);
             return;
@@ -126,6 +127,7 @@ impl Git {
     fn rebase(&self, commit_sha: &str, rebase_branch: &str) {
         if self.dry {
             println!("git rebase {} {}", commit_sha, rebase_branch);
+            return;
         }
         self.execute(vec!["rebase", commit_sha, rebase_branch])
             .expect("Rebase failed!");

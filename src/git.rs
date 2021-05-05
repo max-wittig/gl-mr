@@ -101,27 +101,10 @@ impl Git {
             .to_owned()
     }
 
-    fn get_current_branch(&self) -> String {
-        self.execute(vec!["rev-parse", "--abbrev-ref", "HEAD"])
-            .expect("Could not get current branch!")
-    }
-
     fn get_remote(&self) -> String {
         // TODO: use "origin" by default and ask user for other source, if required
         // This choice should then be remembered and saved somewhere
         String::from("origin")
-    }
-
-    fn switch(&self, branch_name: &str) {
-        if self.get_current_branch() == branch_name {
-            return;
-        }
-        if self.dry {
-            println!("git checkout {}", branch_name);
-            return;
-        }
-        self.execute(vec!["checkout", &branch_name])
-            .expect("Unable to switch branch");
     }
 
     fn rebase(&self, commit_sha: &str, rebase_branch: &str) {

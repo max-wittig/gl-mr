@@ -74,6 +74,7 @@ impl Git {
             .expect("Could not execute git command");
         let status_code = output.status.code().expect("Failed to get status");
         if status_code != 0 {
+            println!("{:?}", &String::from_utf8(output.stderr).ok());
             return Err(status_code);
         }
         Ok(String::from_utf8(output.stdout).expect("Could not parse output"))
@@ -133,20 +134,49 @@ impl Git {
         self.execute(push_command)
             .expect("Could not push to remote");
     }
+
+    fn cherry_pick(&self, original_branch: &str, commit_sha: &str, branch_name: &str) {
+        self.switch(&branch_name);
+        self.execute(vec!["cherry-pick", &commit_sha])
+            .expect("Could not cherry pick commits");
+        self.switch(&original_branch);
+    }
+
+    fn get_current_branch(&self) -> String {
+        self.execute(vec!["rev-parse", "--abbrev-ref", "HEAD"])
+            .expect("Could not get current branch!")
+    }
+
+    fn switch(&self, branch_name: &str) {
+        if self.get_current_branch() == branch_name {
+            return;
+        }
+        if self.dry {
+            println!("git switch {}", branch_name);
+            return;
+        }
+        self.execute(vec!["switch", &branch_name])
+            .expect("Unable to switch branch");
+    }
 }
 
-pub fn get_commit_branch_till_branch(git: &Git, branch_name: &str) -> Vec<CommitDetails> {
+pub fn get_commit_branch_till_branch(
+    git: &Git,
+    branch_name: &str,
+    remote: &str,
+) -> Vec<CommitDetails> {
     git.execute(vec![
         "rev-list",
         "--format=%H|%s|%b|%f",
         "--no-merges",
-        &format!("HEAD...{}", branch_name),
+        &format!("HEAD...{}/{}", remote, branch_name),
     ])
     .expect("Could not get commits!")
     .lines()
     .map(|s| s.to_string())
     .filter(|s| !s.starts_with("commit "))
     .map(|s| CommitDetails::from_str(&s))
+    .rev()
     .collect()
 }
 
@@ -180,10 +210,15 @@ fn get_default_push_options(
     options
 }
 
-fn push_branches(git: &Git, commit_details: &[CommitDetails], target_branch: &str) {
+fn push_branches(
+    git: &Git,
+    commit_details: &[CommitDetails],
+    target_branch: &str,
+    dependent: bool,
+) {
     let last_index = commit_details.len() - 1;
     for (i, commit_detail) in commit_details.iter().enumerate() {
-        let subject = if i != last_index {
+        let subject = if i != last_index && dependent {
             format!("{} {}", "Draft: ", commit_detail.subject)
         } else {
             commit_detail.subject.to_string()
@@ -191,14 +226,29 @@ fn push_branches(git: &Git, commit_details: &[CommitDetails], target_branch: &st
         let push_options =
             get_default_push_options(target_branch, &subject, &commit_detail.description);
         git.push(&commit_detail.branch_name, &push_options);
+        println!("Pushed {}", &commit_detail.branch_name);
     }
 }
 
 fn rebase_commits_onto_branches(git: &Git, commit_details: &[CommitDetails]) {
-    // ignore errors
-    for commit_branch in commit_details {
-        println!("Created {}", commit_branch);
-        git.rebase(&commit_branch.commit_sha, &commit_branch.branch_name);
+    for commit_detail in commit_details.iter() {
+        println!("Created branch {}", commit_detail);
+        git.rebase(&commit_detail.commit_sha, &commit_detail.branch_name);
+    }
+}
+
+fn pick_commits_onto_branches(git: &Git, commit_details: &[CommitDetails]) {
+    for commit_detail in commit_details.iter() {
+        let default_branch = git.get_default_branch();
+        git.cherry_pick(
+            &default_branch,
+            &commit_detail.commit_sha,
+            &commit_detail.branch_name,
+        );
+        println!(
+            "Picked commit {} to branch {}",
+            &commit_detail.commit_sha, &commit_detail.branch_name
+        );
     }
 }
 
@@ -210,11 +260,17 @@ fn get_branches(commit_details: &[CommitDetails]) -> Vec<String> {
         .collect()
 }
 
-pub fn create_separate_merge_requests(git: &Git) {
+pub fn create_separate_merge_requests(git: &Git, dependent: bool) {
     let default_branch = git.get_default_branch();
-    let commit_details = get_commit_branch_till_branch(&git, &default_branch);
+    let remote = git.get_remote();
+    let remote_branch = format!("{}/{}", remote, default_branch);
+    let commit_details = get_commit_branch_till_branch(&git, &default_branch, &remote);
     let branches: Vec<String> = get_branches(&commit_details);
-    create_branches(&git, &branches, &default_branch);
-    rebase_commits_onto_branches(&git, &commit_details);
-    push_branches(&git, &commit_details, &default_branch);
+    create_branches(&git, &branches, &remote_branch);
+    if dependent {
+        rebase_commits_onto_branches(&git, &commit_details);
+    } else {
+        pick_commits_onto_branches(&git, &commit_details);
+    }
+    push_branches(&git, &commit_details, &default_branch, dependent);
 }

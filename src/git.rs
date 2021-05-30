@@ -137,8 +137,12 @@ impl Git {
 
     fn cherry_pick(&self, original_branch: &str, commit_sha: &str, branch_name: &str) {
         self.switch(&branch_name);
-        self.execute(vec!["cherry-pick", &commit_sha])
-            .expect("Could not cherry pick commits");
+        if self.dry {
+            println!("git cherry-pick {}", &commit_sha);
+        } else {
+            self.execute(vec!["cherry-pick", &commit_sha])
+                .expect("Could not cherry pick commits");
+        }
         self.switch(&original_branch);
     }
 

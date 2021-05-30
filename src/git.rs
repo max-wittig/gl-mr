@@ -149,6 +149,8 @@ impl Git {
     fn get_current_branch(&self) -> String {
         self.execute(vec!["rev-parse", "--abbrev-ref", "HEAD"])
             .expect("Could not get current branch!")
+            .trim()
+            .to_owned()
     }
 
     fn switch(&self, branch_name: &str) {

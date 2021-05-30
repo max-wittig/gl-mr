@@ -19,6 +19,7 @@ FLAGS:
     -d, --dependent    Enable dependent commit mode. Useful, when you want to have several MRs that depend on each other
         --dry          Activate dry mode
     -h, --help         Prints help information
+    -r, --reset        Reset branch hard to upstream, after push
     -V, --version      Prints version information
 
 OPTIONS:

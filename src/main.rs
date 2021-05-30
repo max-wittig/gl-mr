@@ -20,6 +20,10 @@ struct Opt {
     /// Enable dependent commit mode. Useful, when you want to have several MRs that depend on each other
     #[structopt(short, long)]
     dependent: bool,
+
+    /// Reset branch hard to upstream, after push
+    #[structopt(short, long)]
+    reset: bool,
 }
 
 fn main() {
@@ -29,5 +33,5 @@ fn main() {
         std::process::exit(1);
     }
     let git = git::Git::new(None, opt.path, opt.dry);
-    git::create_separate_merge_requests(&git, opt.dependent);
+    git::create_separate_merge_requests(&git, opt.dependent, opt.reset);
 }

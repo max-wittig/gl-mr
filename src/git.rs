@@ -164,6 +164,17 @@ impl Git {
         self.execute(vec!["switch", &branch_name])
             .expect("Unable to switch branch");
     }
+
+    fn hard_reset(&self) {
+        let remote_branch = format!("{}/{}", self.get_remote(), self.get_current_branch());
+        if self.dry {
+            println!("git reset --hard {}", &remote_branch);
+            return;
+        }
+        self.execute(vec!["reset", "--hard", &remote_branch])
+            .expect("Unable to reset branch");
+        println!("Reset branch to {}", &remote_branch);
+    }
 }
 
 pub fn get_commit_branch_till_branch(
@@ -265,8 +276,9 @@ fn get_branches(commit_details: &[CommitDetails]) -> Vec<String> {
         .collect()
 }
 
-pub fn create_separate_merge_requests(git: &Git, dependent: bool) {
+pub fn create_separate_merge_requests(git: &Git, dependent: bool, reset: bool) {
     let default_branch = git.get_default_branch();
+    let original_branch = git.get_current_branch();
     let remote = git.get_remote();
     let remote_branch = format!("{}/{}", remote, default_branch);
     let commit_details = get_commit_branch_till_branch(&git, &default_branch, &remote);
@@ -278,4 +290,8 @@ pub fn create_separate_merge_requests(git: &Git, dependent: bool) {
         pick_commits_onto_branches(&git, &commit_details);
     }
     push_branches(&git, &commit_details, &default_branch, dependent);
+    git.switch(&original_branch);
+    if reset {
+        git.hard_reset();
+    }
 }

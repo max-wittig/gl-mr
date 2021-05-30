@@ -216,9 +216,8 @@ fn push_branches(
     target_branch: &str,
     dependent: bool,
 ) {
-    let last_index = commit_details.len() - 1;
     for (i, commit_detail) in commit_details.iter().enumerate() {
-        let subject = if i != last_index && dependent {
+        let subject = if i != 0 && dependent {
             format!("{} {}", "Draft: ", commit_detail.subject)
         } else {
             commit_detail.subject.to_string()

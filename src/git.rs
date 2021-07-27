@@ -12,7 +12,6 @@ pub struct Git {
 pub struct CommitDetails {
     commit_sha: String,
     subject: String,
-    description: String,
     branch_name: String,
 }
 
@@ -22,8 +21,7 @@ impl CommitDetails {
         CommitDetails {
             commit_sha: split_str[0].to_string(),
             subject: split_str[1].to_string(),
-            description: split_str[2].to_string(),
-            branch_name: split_str[3].to_string(),
+            branch_name: split_str[2].to_string(),
         }
     }
 }
@@ -32,8 +30,8 @@ impl std::fmt::Display for CommitDetails {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "{} {} {} {}",
-            self.commit_sha, self.subject, self.description, self.branch_name
+            "{} {} {}",
+            self.commit_sha, self.subject, self.branch_name
         )
     }
 }
@@ -184,7 +182,7 @@ pub fn get_commit_branch_till_branch(
 ) -> Vec<CommitDetails> {
     git.execute(vec![
         "rev-list",
-        "--format=%H|%s|%b|%f",
+        "--format=%H|%s|%f",
         "--no-merges",
         &format!("HEAD...{}/{}", remote, branch_name),
     ])
@@ -239,8 +237,7 @@ fn push_branches(
         } else {
             commit_detail.subject.to_string()
         };
-        let push_options =
-            get_default_push_options(target_branch, &subject, &commit_detail.description);
+        let push_options = get_default_push_options(target_branch, &subject, "");
         git.push(&commit_detail.branch_name, &push_options);
         println!("Pushed {}", &commit_detail.branch_name);
     }

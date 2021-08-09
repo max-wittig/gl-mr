@@ -205,6 +205,7 @@ fn get_default_push_options(
     target_branch: &str,
     commit_message: &str,
     description: &str,
+    assignee: &Option<String>,
 ) -> Vec<String> {
     let mut options: Vec<String> = vec![
         "-o".to_string(),
@@ -222,6 +223,13 @@ fn get_default_push_options(
         options.push("-o".to_string());
         options.push(format!("merge_request.description={}", description));
     }
+    match assignee {
+        Some(value) => {
+            options.push("-o".to_string());
+            options.push(format!("merge_request.assign={}", value));
+        }
+        None => (),
+    }
     options
 }
 
@@ -230,6 +238,7 @@ fn push_branches(
     commit_details: &[CommitDetails],
     target_branch: &str,
     dependent: bool,
+    assignee: &Option<String>,
 ) {
     for (i, commit_detail) in commit_details.iter().enumerate() {
         let subject = if i != 0 && dependent {
@@ -237,7 +246,7 @@ fn push_branches(
         } else {
             commit_detail.subject.to_string()
         };
-        let push_options = get_default_push_options(target_branch, &subject, "");
+        let push_options = get_default_push_options(target_branch, &subject, "", &assignee);
         git.push(&commit_detail.branch_name, &push_options);
         println!("Pushed {}", &commit_detail.branch_name);
     }
@@ -273,7 +282,12 @@ fn get_branches(commit_details: &[CommitDetails]) -> Vec<String> {
         .collect()
 }
 
-pub fn create_separate_merge_requests(git: &Git, dependent: bool, reset: bool) {
+pub fn create_separate_merge_requests(
+    git: &Git,
+    dependent: bool,
+    reset: bool,
+    assignee: &Option<String>,
+) {
     let default_branch = git.get_default_branch();
     let original_branch = git.get_current_branch();
     let remote = git.get_remote();
@@ -286,7 +300,7 @@ pub fn create_separate_merge_requests(git: &Git, dependent: bool, reset: bool) {
     } else {
         pick_commits_onto_branches(&git, &commit_details);
     }
-    push_branches(&git, &commit_details, &default_branch, dependent);
+    push_branches(&git, &commit_details, &default_branch, dependent, assignee);
     git.switch(&original_branch);
     if reset {
         git.hard_reset();

@@ -23,6 +23,7 @@ FLAGS:
     -V, --version      Prints version information
 
 OPTIONS:
+    -a, --assignee <assignee>    Set assignee
     -g, --git <git>      Git executable. Defaults to the executable that's in $PATH [default: git]
     -p, --path <path>    Path to the git repository. Defaults to the current working directory [default: .]
 ```

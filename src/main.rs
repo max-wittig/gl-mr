@@ -24,6 +24,10 @@ struct Opt {
     /// Reset branch hard to upstream, after push
     #[structopt(short, long)]
     reset: bool,
+
+    /// Set assignee
+    #[structopt(short, long)]
+    assignee: Option<String>,
 }
 
 fn main() {
@@ -33,5 +37,5 @@ fn main() {
         std::process::exit(1);
     }
     let git = git::Git::new(None, opt.path, opt.dry);
-    git::create_separate_merge_requests(&git, opt.dependent, opt.reset);
+    git::create_separate_merge_requests(&git, opt.dependent, opt.reset, &opt.assignee);
 }
